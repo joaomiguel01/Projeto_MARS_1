@@ -30,6 +30,19 @@
 	# Textos e mensagens
 	banner:		.asciiz "SAHJ-shell>> "
 	quebra_linha:	.asciiz "\n"
+	erro_msg:	.asciiz "Comando invalido!\n"
+	
+	# Comandos
+	cmd_addMorador:	.asciiz "addMorador"
+	cmd_rmvMorador:	.asciiz "rmvMorador"
+	cmd_addAuto:	.asciiz "addAuto"
+	cmd_rmvAuto:	.asciiz "rmvAuto"
+	cmd_limparAp:	.asciiz "limparAp"
+	cmd_infoAp:	.asciiz "infoAp"
+	cmd_infoGeral:	.asciiz "infoGeral"
+	cmd_salvar:	.asciiz "salvar"
+	cmd_recarregar:	.asciiz "recarregar"
+	cmd_formatar:	.asciiz "formatar"
 	
 	# Buffers
 	buffer:		.space	501	# Buffer principal
@@ -42,14 +55,15 @@
 	# Tabela de APs
 	# Estrutura do AP
 	#	- 0 - 383 (384 bytes para os nomes dos moradores [64 bytes para no máximo 6 pessoas])
-	#	- 384	(1 bytes para o status do apartamento [0 - Vazio, 1 - Não Vazio])
-	#	- 385 - 386 (2 bytes para endereçar o número do AP [101, 102, 201, 202, ... , 1201, 1202])
-	#	- 387 (1 byte para o tipo do automóvel [0 - Nenhum, c - Carro, m - Moto])
-	#	- 388 (1 byte para quantidade de veículos [1 carro ou no máximo 2 motos])
-	#	- 388 - 535 (74 bytes para registrar modelo e placa (caso carro) ou 148 bytes (caso 2 motos))
-	# Total de bytes por AP: 536 bytes
-	# Total para os 12 andares = 536 * 24 = 12864 bytes
-	main_memory: 	.space 12864
+	#	- 384 (1 bytes para o status do apartamento [0 - Vazio, 1 - Não Vazio])
+	#	- 385 (1 byte para o número de pessoas [máx 6])
+	#	- 386 - 387 (2 bytes para endereçar o número do AP [101, 102, 201, 202, ... , 1201, 1202])
+	#	- 388 (1 byte para o tipo do automóvel [0 - Nenhum, c - Carro, m - Moto])
+	#	- 389 (1 byte para quantidade de veículos [1 carro ou no máximo 2 motos])
+	#	- 390 - 535 (74 bytes para registrar modelo e placa (caso carro) ou 148 bytes (caso 2 motos))
+	# Total de bytes por AP: 537 bytes
+	# Total para os 12 andares = 537 * 24 = 12888 bytes
+	main_memory: 	.space 12888
 
 # -------------------------------------------------------
 # Código Principal
@@ -77,7 +91,73 @@ main_loop:
 	# Executar o parser para separar o comando e os argumentos em buffers
 	jal cmd_parser
 	
-	# Teste de dispacher
+	# Teste de dispatcher
+	
+	# Se for o 1º comando: addMorador
+	la $a0, cmd_main
+	la $a1, cmd_addMorador
+	jal strcmp
+	beq $v0, $zero, addMorador
+	
+	# Se for o 2º comando: rmvMorador
+	la $a0, cmd_main
+	la $a1, cmd_rmvMorador
+	jal strcmp
+	beq $v0, $zero, rmvMorador
+	
+	# Se for o 3º comando: addAuto
+	la $a0, cmd_main
+	la $a1, cmd_addAuto
+	jal strcmp
+	beq $v0, $zero, addAuto
+	
+	# Se for o 4º comando: rmvAuto
+	la $a0, cmd_main
+	la $a1, cmd_rmvAuto
+	jal strcmp
+	beq $v0, $zero, rmvAuto
+	
+	# Se for o 5º comando: limparAp
+	la $a0, cmd_main
+	la $a1, cmd_limparAp
+	jal strcmp
+	beq $v0, $zero, limparAp
+	
+	# Se for o 6º comando: infoAp
+	la $a0, cmd_main
+	la $a1, cmd_infoAp
+	jal strcmp
+	beq $v0, $zero, infoAp
+	
+	# Se for o 7º comando: infoGeral
+	la $a0, cmd_main
+	la $a1, cmd_infoGeral
+	jal strcmp
+	beq $v0, $zero, infoGeral
+	
+	# Se for o 8º comando: salvar
+	la $a0, cmd_main
+	la $a1, cmd_salvar
+	jal strcmp
+	beq $v0, $zero, salvar
+	
+	# Se for o 9º comando: recarregar
+	la $a0, cmd_main
+	la $a1, cmd_recarregar
+	jal strcmp
+	beq $v0, $zero, recarregar
+	
+	# Se for o 10º comando: formatar
+	la $a0, cmd_main
+	la $a1, cmd_formatar
+	jal strcmp
+	beq $v0, $zero, formatar
+	
+	# Caso não seja nenhum dos comandos acima, logo o comando está inválido
+	li $v0, 4
+	la $a0, erro_msg
+	syscall
+	
 	
 	# Volta para o loop
 	j main_loop
@@ -230,11 +310,155 @@ parser_done:
 
 
 
+# Comandos a serem implementados
+addMorador:
+	# Adiciona um morador a um AP
+	# 1º Verificar se os buffers option1 e option2 não estão vazios
+	# 2º Verificar se o número do AP existe
+	# 3º Verificar se o nome da pessoa já existe no AP
+	# 4º Verificar se o número máximo de pessoas foi atingido (máx 6)
+	# 5º Calcular o endereço de memória no AP
+	# 6º Salvar o nome da pessoa no respectivo endereço
+	# 7º Caso o status do quarto seja vazio, mudar para não vazio
+	
+	# Volta para a main
+	j main_loop
+
+rmvMorador:
+	# Remove um morador de um AP
+	# 1º Verificar se os buffers option1 e option2 não estão vazios
+	# 2º Verificar se o número do AP existe
+	# 3º Verificar se o nome da pessoa existe no AP
+	# 4º Verificar se o número pessoas é maior que zero
+	# 5º Calcular o endereço de memória no AP
+	# 6º Remover o nome da pessoa no respectivo endereço
+	# 7º Caso o status do AP seja não vazio e só tenha 1 pessoa, mudar para vazio
+	
+	# Volta para a main
+	j main_loop
+
+addAuto:
+	# Adiciona um automóvel a um AP
+	# 1º Verificar se os buffers option1, option2, option3, option4 não estão vazios
+	# 2º Verificar se o número do AP existe
+	# 3º Verificar se o automóvel existe no AP
+	# 4º Verificar se o número pessoas é maior que zero
+	# 5º Verificar qual o tipo de automóvel
+	# 6º Verificar a quantidade de automóveis
+	# 7º Calcular o endereço de memória no AP
+	# 8º Salvar o automóvel no respectivo endereço
+	
+	# Volta para a main
+	j main_loop
+
+rmvAuto:
+	# Remove um automóvel de um AP
+	# 1º Verificar se os buffers option1 e option2 não estão vazios
+	# 2º Verificar se o número do AP existe
+	# 3º Verificar se o automóvel existe no AP
+	# 4º Calcular o endereço de memória no AP
+	# 5º Remover o automóvel no respectivo endereço
+	# 6º Atualizar o número de automóveis
+	
+	# Volta para a main
+	j main_loop
+
+limparAp:
+	# Apaga dados do AP na memória e no arquivo de dados
+	# 1º Verificar se o buffer option1 não está vazio
+	# 2º Verificar se o número do AP existe
+	# 3º Limpar todo o AP na memória e no arquivo
+	
+	# Volta para a main
+	j main_loop
+
+infoAp:
+	# Informações sobre o um AP
+	# 1º Verificar se o buffer option1 não está vazio
+	# 2º Verificar se o número do AP existe
+	# 3º Caso o AP não esteja vazio, listar informações
+	# 4º Caso contrário, imprimir o número do AP e seu status de vazio
+		
+	# Volta para a main
+	j main_loop
+
+infoGeral:
+	# Informações gerais dos APs
+	# 1º Informaçõs da porcentagem de APs vazios e APs não vazios
+		
+	# Volta para a main
+	j main_loop
+
+salvar:
+	# Salva dados da memória no arquivo
+	# 1º Salvar dados da memória
+	
+	# Volta para a main
+	j main_loop
+
+recarregar:
+	# Carregar dados do arquivo na memória
+	# 1º Puxar dados do arquivo para a memória
+	
+	# Volta para a main
+	j main_loop
+
+formatar:
+	# Apaga todos os dados da memória, mas não do arquivo
+	# 1º Zerar a main_memory
+	
+	# Volta para a main
+	j main_loop
+
+
+
+
+
 
 
 # -------------------------------------------------------
 # Funções auxiliares
 # -------------------------------------------------------
+
+# Função: strcpy (destination, source)
+# Função usada para copiar a string de source dentro de destination
+# $a1 -> Endereço do source
+# $a0 -> Endereço do destination
+
+strcpy:	
+	# Copia endereços para registradores temporários
+	add $t0, $0, $a1 # Source
+	add $t1, $0, $a0 # Destination
+	
+	# Carrega o caractere
+	lb $t2, 0($t0) # Primeiro caractere
+	
+	
+	loop_strcpy:
+		# Testa se chegou no último caractere '\0'
+		beq $t2, $0, exit_strcpy
+	
+		# Salva o caractere no buffer do destination
+		sb $t2, 0($t1)
+	
+		# Incrementa
+		addi $t0, $t0, 1
+		addi $t1, $t1, 1
+		
+		# Próximo caractere
+		lb $t2, 0($t0)
+	
+		# Volta o loop
+		j loop_strcpy
+	
+	exit_strcpy:
+		sb $t2, 0($t1) # Salva o '\0' caractere no buffer do destination
+		
+		add $v0, $0, $a0
+		
+		# Endereço de retorno
+		# Volta para o main
+		jr $ra
 
 # Função: memcpy (destination, source, num)
 # Função usada para copiar bytes de source dentro de destination
