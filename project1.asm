@@ -31,6 +31,9 @@
 	banner:		.asciiz "SAHJ-shell>> "
 	quebra_linha:	.asciiz "\n"
 	erro_msg:	.asciiz "Comando invalido!\n"
+	nome_arquivo:	.asciiz "dados.txt"
+	msg_save:	.asciiz "Alterações salvas com sucesso!\n"
+	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOMÍNIO      \n------------------------------\n\n"
 	
 	# Comandos
 	cmd_addMorador:	.asciiz "addMorador"
@@ -63,6 +66,7 @@
 	#	- 390 - 535 (74 bytes para registrar modelo e placa (caso carro) ou 148 bytes (caso 2 motos))
 	# Total de bytes por AP: 537 bytes
 	# Total para os 12 andares = 537 * 24 = 12888 bytes
+	max_main_memory: .word 12888	# Caso queira alterar o tamanho da memória
 	main_memory: 	.space 12888
 
 # -------------------------------------------------------
@@ -73,7 +77,13 @@
 .globl main
 
 main:
-	# Recarregar dados do arquivo para o programa
+	# Exibir título de boas vindas
+	li $v0, 4		# Syscall para escrever string
+	la $a0, titulo		# titulo a ser exibido
+	syscall
+	
+	# Recarregar os últimos dados do arquivo para o programa
+	j recarregar
 
 # Loop principal
 main_loop:
@@ -391,14 +401,57 @@ infoGeral:
 
 salvar:
 	# Salva dados da memória no arquivo
-	# 1º Salvar dados da memória
+	# 1º Abrir o arquivo "dados.txt" para escrita
+	li $v0, 13		# Syscall para abri um arquivo
+	la $a0, nome_arquivo	# Caminho do arquivo ".txt" dos dados
+	li $a1, 1		# Flag para escrever no arquivo
+	li $a2, 0		# Modo
+	syscall
+	
+	move $t1, $v0		# Salva o file descriptor
+	
+	# 2º Salvar dados da main_memory para o arquivo dados.txt
+	li $v0, 15		# Syscall para escrever em um arquivo
+	move $a0, $t1		# Define o file descriptor
+	la $a1, main_memory	# Endereço do buffer da main_memory
+	lw $a2, max_main_memory	# Quantidade de bytes a serem escritos no arquivo
+	syscall
+	
+	# 3º Fechar o arquivo
+	li $v0, 16		# Syscall para fechar o arquivo
+	move $a0, $t1		# Define o file descriptor
+	syscall			
+	
+	# 4º Mensagem dizendo que os dados foram salvos
+	li $v0, 4		# Syscall para imprimir na tela
+	la $a0, msg_save	# Mensagem dizendo que as alterações foram salvas
+	syscall
 	
 	# Volta para a main
 	j main_loop
 
 recarregar:
 	# Carregar dados do arquivo na memória
-	# 1º Puxar dados do arquivo para a memória
+	# 1º Abrir o arquivo "dados.txt" para leitura
+	li $v0, 13		# Syscall para abrir o arquivo
+	la $a0, nome_arquivo	# Caminho do arquivo ".txt"
+	li $a1, 0		# Flag para ler o arquivo
+	li $a2, 0		# Modo
+	syscall
+	
+	move $t1, $v0		# Salva o file descriptor
+	
+	# 2º Ler dados do arquivo e carregar em main_memory
+	li $v0, 14		# Syscall para ler arquivo
+	move $a0, $t1		# Passa o file descriptor
+	la $a1, main_memory	# Endereço de memória para onde os dados vão ser carregados
+	lw $a2, max_main_memory # Tamanho máximo de bytes a serem lidos
+	syscall
+	
+	# 3º Fechar o arquivo
+	li $v0, 16		# Syscall para fechar o arquivo
+	move $a0, $t1		# Define o file descriptor
+	syscall
 	
 	# Volta para a main
 	j main_loop
