@@ -16,7 +16,7 @@
 #	- Comandos:
 #		- addMorador --<option1> --<option2> 				// addMorador --1102 --Claude Shannon
 #		- rmvMorador --<option1> --<option2>				// rmvMorador --1102 --Claude Shannon
-#		- AddAuto --<option1> --<option2> --<option3> --<option4>	// addAuto --303 --c --Fiat Uno --ABC1234
+#		- addAuto --<option1> --<option2> --<option3> --<option4>	// addAuto --303 --c --Fiat Uno --ABC1234
 #		- rmvAuto --<option1> --<option2>				// rmvAuto --303 --ABC1234
 #		- limparAp --<option1>						// limparAp --1001
 #		- infoAp --<option1>						// infoAp --1001
@@ -24,6 +24,8 @@
 #		- salvar
 #		- recarregar
 #		- formatar
+#		- help
+#		- exit
 
 # Seção de dados
 .data
@@ -34,18 +36,21 @@
 	nome_arquivo:	.asciiz "dados.txt"
 	msg_save:	.asciiz "Alterações salvas com sucesso!\n"
 	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOMÍNIO      \n------------------------------\n\n"
+	help_rsp:	.asciiz "\n------------------------------------------------------------------------------------------------------------------------\n                                                   COMANDOS DO SISTEMA                                                  \n------------------------------------------------------------------------------------------------------------------------\n\n\t- addMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento (ex: 101 a 1202)\n\t\t// <option2>: Nome completo do morador a ser adicionado (max: 6 por AP)\n\n\t- rmvMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Nome do morador a ser removido\n\n\t- addAuto --<option1> --<option2> --<option3> --<option4>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Tpo do veiculo ('c' para Carro [max 1] ou 'm' para Moto [max 2])\n\t\t// <option3>: Modelo do veiculo (ex: Fiat Uno)\n\t\t// <option4>: Placa do veiculo (ex: ABC1234)\n\n\t- rmvAuto --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Placa do veiculo a ser removido\n\n\t- limparAp --<option1>\n\t\t// <option1>: Numero do apartamento cujos dados serao apagados da memoria\n\n\t- infoAp --<option1>\n\t\t// <option1>: Numero do apartamento para exibir detalhes (moradores e veiculos)\n\n\t- infoGeral\n\t\t// Exibe estatisticas gerais do condominio (porcentagem de APs ocupados/vazios)\n\n\t- salvar\n\t\t// Salva os dados atuais contidos na memoria RAM para o arquivo 'dados.txt'\n\n\t- recarregar\n\t\t// Carrega e atualiza a memoria RAM com os dados salvos em 'dados.txt'\n\n\t- formatar\n\t\t// Limpa todos os dados da memoria RAM (nao altera o arquivo no disco)\n\n\t- help\n\t\t// Exibe esta lista de comandos do sistema\n\n\t- exit\n\t\t// Permitir sair do programa principal e salvar os dados\n\n------------------------------------------------------------------------------------------------------------------------\n\n"
 	
 	# Comandos
-	cmd_addMorador:	.asciiz "addMorador"
-	cmd_rmvMorador:	.asciiz "rmvMorador"
-	cmd_addAuto:	.asciiz "addAuto"
-	cmd_rmvAuto:	.asciiz "rmvAuto"
-	cmd_limparAp:	.asciiz "limparAp"
-	cmd_infoAp:	.asciiz "infoAp"
-	cmd_infoGeral:	.asciiz "infoGeral"
-	cmd_salvar:	.asciiz "salvar"
-	cmd_recarregar:	.asciiz "recarregar"
-	cmd_formatar:	.asciiz "formatar"
+	cmd_addMorador:	.asciiz "addMorador"		# Comando para adicionar morador
+	cmd_rmvMorador:	.asciiz "rmvMorador"		# Comando para remover morador
+	cmd_addAuto:	.asciiz "addAuto"		# Comando para adicionar automóvel
+	cmd_rmvAuto:	.asciiz "rmvAuto"		# Comando para remover automóvel
+	cmd_limparAp:	.asciiz "limparAp"		# Comando para apagar dados AP da memória
+	cmd_infoAp:	.asciiz "infoAp"		# Comando para ver informações do AP
+	cmd_infoGeral:	.asciiz "infoGeral"		# Comando para ver informações gerais sobre os AP
+	cmd_salvar:	.asciiz "salvar"		# Comando para salvar dados da memória do programa no arquivo "dados.txt"
+	cmd_recarregar:	.asciiz "recarregar"		# Comando para carregar dados do arquivo "dados.txt" na memória
+	cmd_formatar:	.asciiz "formatar"		# Comando para apagar todos os dados da memória do programa
+	cmd_help:	.asciiz "help"			# Comando para listar todos os comandos do sistema
+	cmd_exit:	.asciiz "exit"			# Comando para sair do sistema
 	
 	# Buffers
 	buffer:		.space	501	# Buffer principal
@@ -82,6 +87,7 @@ main:
 	la $a0, titulo		# titulo a ser exibido
 	syscall
 	
+	# Verificar se o arquivo .txt já existe ou precisa ser criado (a fazer)
 	# Recarregar os últimos dados do arquivo para o programa
 	j recarregar
 
@@ -163,6 +169,18 @@ main_loop:
 	jal strcmp
 	beq $v0, $zero, formatar
 	
+	# Se for o 11º comando: help
+	la $a0, cmd_main
+	la $a1, cmd_help
+	jal strcmp
+	beq $v0, $zero, help
+	
+	# Se for o 12º comando: exit
+	la $a0, cmd_main
+	la $a1, cmd_exit
+	jal strcmp
+	beq $v0, $zero, exit
+	
 	# Caso não seja nenhum dos comandos acima, logo o comando está inválido
 	li $v0, 4
 	la $a0, erro_msg
@@ -173,7 +191,7 @@ main_loop:
 	j main_loop
 	
 # -------------------------------------------------------
-# Funcionalidades
+# Parser do terminal
 # -------------------------------------------------------
 
 cmd_parser:
@@ -318,9 +336,10 @@ parser_done:
 	
 	jr $ra # Retorna para a main
 
-
-
+# -------------------------------------------------------
 # Comandos a serem implementados
+# -------------------------------------------------------
+
 addMorador:
 	# Adiciona um morador a um AP
 	# 1º Verificar se os buffers option1 e option2 não estão vazios
@@ -374,7 +393,7 @@ rmvAuto:
 	j main_loop
 
 limparAp:
-	# Apaga dados do AP na memória e no arquivo de dados
+	# Apaga dados do AP na memória
 	# 1º Verificar se o buffer option1 não está vazio
 	# 2º Verificar se o número do AP existe
 	# 3º Limpar todo o AP na memória e no arquivo
@@ -458,13 +477,37 @@ recarregar:
 
 formatar:
 	# Apaga todos os dados da memória, mas não do arquivo
-	# 1º Zerar a main_memory
+	# 1º Mensagem de confirmação
+	
+	# 2º Preparar argumentos
+	
+	la $a0, main_memory		# Endereço do buffer a ser limpo
+	lw $a1, max_main_memory		# Número de bytes a serem limpos
+	
+	jal limpar_buffer		# Chama a função para limpar toda a memória principal do programa
 	
 	# Volta para a main
 	j main_loop
 
+help:
+	# Exibe texto com os comandos, argumentos e a explicação de cada funcionalidade
+	# 1º Escreve texto de comandos na tela
+	li $v0, 4		# Syscall para imprimir string
+	la $a0, help_rsp	# Endereço da mensagem que vai ser impressa
+	syscall
+	
+	# Volta para a main
+	j main_loop
 
-
+exit:
+	# Permite sair do programa e salvar os dados
+	# 1º Mensagem de confirmação
+	
+	# 2º Salvar dados antes de sair
+	
+	# 3º Sair do simulador
+	li $v0, 10		# Syscall para encerrar o simulador
+	syscall
 
 
 
