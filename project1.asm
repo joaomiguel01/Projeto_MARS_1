@@ -32,12 +32,14 @@
 	# Textos e mensagens
 	banner:		.asciiz "SAHJ-shell>> "
 	quebra_linha:	.asciiz "\n"
-	erro_msg:	.asciiz "Comando invalido!\n"
+	erro_msg:	.asciiz "Comando invalido\n"
 	nome_arquivo:	.asciiz "dados.txt"
 	msg_save:	.asciiz "Alterações salvas com sucesso!\n"
-	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOM�?NIO      \n------------------------------\n\n"
+	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOMINIO      \n------------------------------\n\n"
 	help_rsp:	.asciiz "\n------------------------------------------------------------------------------------------------------------------------\n                                                   COMANDOS DO SISTEMA                                                  \n------------------------------------------------------------------------------------------------------------------------\n\n\t- addMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento (ex: 101 a 1202)\n\t\t// <option2>: Nome completo do morador a ser adicionado (max: 6 por AP)\n\n\t- rmvMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Nome do morador a ser removido\n\n\t- addAuto --<option1> --<option2> --<option3> --<option4>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Tpo do veiculo ('c' para Carro [max 1] ou 'm' para Moto [max 2])\n\t\t// <option3>: Modelo do veiculo (ex: Fiat Uno)\n\t\t// <option4>: Placa do veiculo (ex: ABC1234)\n\n\t- rmvAuto --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Placa do veiculo a ser removido\n\n\t- limparAp --<option1>\n\t\t// <option1>: Numero do apartamento cujos dados serao apagados da memoria\n\n\t- infoAp --<option1>\n\t\t// <option1>: Numero do apartamento para exibir detalhes (moradores e veiculos)\n\n\t- infoGeral\n\t\t// Exibe estatisticas gerais do condominio (porcentagem de APs ocupados/vazios)\n\n\t- salvar\n\t\t// Salva os dados atuais contidos na memoria RAM para o arquivo 'dados.txt'\n\n\t- recarregar\n\t\t// Carrega e atualiza a memoria RAM com os dados salvos em 'dados.txt'\n\n\t- formatar\n\t\t// Limpa todos os dados da memoria RAM (nao altera o arquivo no disco)\n\n\t- help\n\t\t// Exibe esta lista de comandos do sistema\n\n\t- exit\n\t\t// Permitir sair do programa principal e salvar os dados\n\n------------------------------------------------------------------------------------------------------------------------\n\n"
-	apt_invalido:   .asciiz "Falha: APT invalido\n"
+	apt_invalido:   .asciiz "Falha: AP invalido\n"
+	apt_lotado:     .asciiz "Falha: AP com numero max de moradores\n"
+	nome_vazio:	.asciiz "Falha: Nome vazio\n"
 	
 	# Comandos
 	cmd_addMorador:	.asciiz "addMorador"		# Comando para adicionar morador
@@ -343,15 +345,58 @@ parser_done:
 
 addMorador:
 	# Adiciona um morador a um AP
-	# 1º Verificar se os buffers option1 e option2 não estão vazios
-	# 2º Verificar se o número do AP existe
-	# 3º Verificar se o nome da pessoa já existe no AP
-	# 4º Verificar se o número máximo de pessoas foi atingido (máx 6)
-	# 5º Calcular o endereço de memória no AP
-	# 6º Salvar o nome da pessoa no respectivo endereço
-	# 7º Caso o status do quarto seja vazio, mudar para não vazio
+	# 1 Verificar se os buffer option2 esta vazio
+	la $t0, cmd_option2 #guarda a string
+	lb $t1, 0($t0) # pega o primeiro caracter
+	beq $t1, 0, nExiste #verifica se o nome esta vazio
+	beq $t1, 10, main_loop #se deu apenas enter, volta pro loop
+	
+	# 2 Verificar se o numero do AP existe
+	jal existeApt #verifica se o apt existe
+	bltz $v0, main_loop #caso nao, volta para o main
+	
+	# 3 Verificar se o numero maximo de pessoas foi atingido
+	move $s0, $v0 #salva o endereco do apt
+	lb $t2, 385($s0) #pega o byte dos moradores
+	beq $t2, 6, lotado #verifica se esta lotado
+	
+#$t2 guarda o byte de moradores
+#contador 6 vezes
+addi $t3, $0, 0 #contador
+move $t4, $s0 #copia para um registrador temporario
+achaApt: #achar um byte livre para guardar o morador
+	beq $t3, 6, lotado #compara o contador
+	lb $t1, 0($t4) #pega o byte  
+	beq $t1, 0, guardar #verifica se esta vazio
+	addi $t4, $t4, 64 #avanca para o proximo slot
+	addi $t3, $t3, 1 #adiciona o contador
+	j achaApt #volta o loop
+	
+guardar:
+	la $a1, cmd_option2 #manda a string de cmd_option2
+	move $a0, $t4 #guarda no slot de moradores
+	jal strcpy #copia
+	addi $t2, $t2, 1 #+1 no byte de quantidade de moradores
+	sb $t2, 385($s0) # grava a nova quantidade de moradores
+	addi $t5, $0, 1
+	sb $t5, 384($s0) #pega o byte de status do apartamento
+	j main_loop
+	
+lotado: 
+	li $v0, 4 # Syscall para escrever string
+	la $a0, apt_lotado #imprime a mensagem de falha
+	syscall	
+	addi $v0, $0, -1 #manda para o retorno a falha
+	j main_loop
 	
 	# Volta para a main
+	j main_loop
+
+nExiste:
+	li $v0, 4 # Syscall para escrever string
+	la $a0, nome_vazio #imprime a mensagem de falha
+	syscall	
+	addi $v0, $0, -1 #manda para o retorno a falha
 	j main_loop
 
 rmvMorador:
