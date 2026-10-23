@@ -1,4 +1,4 @@
-# Nomes: João Miguel Oliveira de Carvalho
+# Nomes: João Miguel Oliveira de Carvalho, Alicia Maria de S. M. Gomes
 # Data: 16/10/2026
 # Atividade: 1 VA
 # Disciplina: Arquitetura e Organização de Computadores
@@ -35,8 +35,9 @@
 	erro_msg:	.asciiz "Comando invalido!\n"
 	nome_arquivo:	.asciiz "dados.txt"
 	msg_save:	.asciiz "Alterações salvas com sucesso!\n"
-	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOMÍNIO      \n------------------------------\n\n"
+	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOM�?NIO      \n------------------------------\n\n"
 	help_rsp:	.asciiz "\n------------------------------------------------------------------------------------------------------------------------\n                                                   COMANDOS DO SISTEMA                                                  \n------------------------------------------------------------------------------------------------------------------------\n\n\t- addMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento (ex: 101 a 1202)\n\t\t// <option2>: Nome completo do morador a ser adicionado (max: 6 por AP)\n\n\t- rmvMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Nome do morador a ser removido\n\n\t- addAuto --<option1> --<option2> --<option3> --<option4>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Tpo do veiculo ('c' para Carro [max 1] ou 'm' para Moto [max 2])\n\t\t// <option3>: Modelo do veiculo (ex: Fiat Uno)\n\t\t// <option4>: Placa do veiculo (ex: ABC1234)\n\n\t- rmvAuto --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Placa do veiculo a ser removido\n\n\t- limparAp --<option1>\n\t\t// <option1>: Numero do apartamento cujos dados serao apagados da memoria\n\n\t- infoAp --<option1>\n\t\t// <option1>: Numero do apartamento para exibir detalhes (moradores e veiculos)\n\n\t- infoGeral\n\t\t// Exibe estatisticas gerais do condominio (porcentagem de APs ocupados/vazios)\n\n\t- salvar\n\t\t// Salva os dados atuais contidos na memoria RAM para o arquivo 'dados.txt'\n\n\t- recarregar\n\t\t// Carrega e atualiza a memoria RAM com os dados salvos em 'dados.txt'\n\n\t- formatar\n\t\t// Limpa todos os dados da memoria RAM (nao altera o arquivo no disco)\n\n\t- help\n\t\t// Exibe esta lista de comandos do sistema\n\n\t- exit\n\t\t// Permitir sair do programa principal e salvar os dados\n\n------------------------------------------------------------------------------------------------------------------------\n\n"
+	apt_invalido:   .asciiz "Falha: APT invalido\n"
 	
 	# Comandos
 	cmd_addMorador:	.asciiz "addMorador"		# Comando para adicionar morador
@@ -675,10 +676,73 @@ limpar_buffer_loop:
 limpar_buffer_end:
 	# Volta para a função anterior
 	jr $ra
+	
+#funcao: existeApt
+#verifica se o numero que o usuario digitou no cmd_option1 existe, ou seja, se esse apt realmente existe
 
+existeApt:
+	la $t5, cmd_option1
+	lb $t1, 0($t5)#le o primeiro byte
+	beq $t1, 0, invalido #verifica se eh 0, se for, eh invalido
 
+addi $t0, $0, 0 #acumulador usado para somar/guardar o caracter em ascii
+addi $t3, $0, 10 #valor usado para multiplicar o acumulador
+#$t5 usado para guardar o valor original do endereco
+# os numeros 0 a 9 em ascii valem de 48 a 57
+# acumulador ira verificar se o que o usuario digitou esta dentro desse intervalo
+acumulador:
+	lb $t1, 0($t5) #le o caracter
+	beq $t1, 0, separaAndar #chegou no fim da string
+	beq $t1, 32, separaAndar #verifica se eh um espaco
+	beq $t1, 10, separaAndar #nova linha (\n)
+	
+	blt $t1, 48, invalido  #verifica se eh menor que 48(0), se for, eh invalido
+	bgt $t1, 57, invalido  #verifica se eh maior que 57(9), se for, eh invalido
 
+#se for valido, calcula
+	addi $t1, $t1, -48 #subtrai por 48
+	multu $t0, $t3 # multiplica o acumulador por 10
+	mflo $t0 #acessa o resultado da multiplicacao
+	add $t0, $t1, $t0 #salva no acumulador o resultado
+	addi $t5, $t5, 1 #passa para o proximo caracter
+	j acumulador #volta para o loop
 
+separaAndar:
+#para descobrir o andar e o numero de quarto, divide o numero do apt por 100
+#o quociente seria o andar e o resto o final do apt
+#como so pode ter 2 apt por andar, o final seria 1 ou 2
+addi $t1, $0, 100 #usado para fazer a divisao
+	divu $t0, $t1 #faz a divisao
+	mflo $t2 #acessa o quociente/andar
+	blt $t2, 1, invalido #verifica se eh menor que 1
+	bgt $t2, 12, invalido #verifica se eh maior que 12
+	mfhi $t3 #acessa resto/quarto
+	blt $t3, 1, invalido #verifica se eh menor que 1
+	bgt $t3, 2, invalido #verifica se eh maior que 2
+#se passou em tudo, entao calcula o endereco com o main
+#faremos um indice:(andar-1).2 + (quarto-1)
+#transformamos o andar e o quarto em indices de 0 a 23, apt 101 eh 0, 102 eh 1 e assim vai
+#indice=$v0
+	addi $t4, $t2, -1 #andar-1
+	sll $t4, $t4, 1 #(andar-1).2
+	addi $t5, $t3, -1 #quarto-1
+	add $t4, $t4, $t5 #(andar-1).2 + (quarto-1)
+addi $t5, $0, 537 #tamanho de cada apt
+	multu $t4, $t5 #multiplica o indice pelo tamanho de um apt
+	mflo $t6 #acessa o valor
+	la $t7, main_memory #acessa o endereco da memoria principal
+	add $v0, $t6, $t7 #soma o indice com o endereco de memoria, assim obtendo o endereco de um apt
+	sb $t2, 386($v0) # Salva o andar (1 a 12) no byte 386
+    	sb $t3, 387($v0) # Salva o quarto (1 ou 2) no byte 387
+    	move $v1, $t0 # Deixa o numero completo (ex: 1102) em $v1
+    	jr $ra
+    	
+invalido:
+	li $v0, 4 # Syscall para escrever string
+	la $a0, apt_invalido #imprime a mensagem de falha
+	syscall	
+	addi $v0, $0, -1 #manda para o retorno a falha
+	jr $ra
 
 
 
