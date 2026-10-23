@@ -30,13 +30,16 @@
 # Seção de dados
 .data
 	# Textos e mensagens
-	banner:		.asciiz "SAHJ-shell>> "
-	quebra_linha:	.asciiz "\n"
-	erro_msg:	.asciiz "Comando invalido!\n"
-	nome_arquivo:	.asciiz "dados.txt"
-	msg_save:	.asciiz "Alterações salvas com sucesso!\n"
-	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOMÍNIO      \n------------------------------\n\n"
-	help_rsp:	.asciiz "\n------------------------------------------------------------------------------------------------------------------------\n                                                   COMANDOS DO SISTEMA                                                  \n------------------------------------------------------------------------------------------------------------------------\n\n\t- addMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento (ex: 101 a 1202)\n\t\t// <option2>: Nome completo do morador a ser adicionado (max: 6 por AP)\n\n\t- rmvMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Nome do morador a ser removido\n\n\t- addAuto --<option1> --<option2> --<option3> --<option4>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Tpo do veiculo ('c' para Carro [max 1] ou 'm' para Moto [max 2])\n\t\t// <option3>: Modelo do veiculo (ex: Fiat Uno)\n\t\t// <option4>: Placa do veiculo (ex: ABC1234)\n\n\t- rmvAuto --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Placa do veiculo a ser removido\n\n\t- limparAp --<option1>\n\t\t// <option1>: Numero do apartamento cujos dados serao apagados da memoria\n\n\t- infoAp --<option1>\n\t\t// <option1>: Numero do apartamento para exibir detalhes (moradores e veiculos)\n\n\t- infoGeral\n\t\t// Exibe estatisticas gerais do condominio (porcentagem de APs ocupados/vazios)\n\n\t- salvar\n\t\t// Salva os dados atuais contidos na memoria RAM para o arquivo 'dados.txt'\n\n\t- recarregar\n\t\t// Carrega e atualiza a memoria RAM com os dados salvos em 'dados.txt'\n\n\t- formatar\n\t\t// Limpa todos os dados da memoria RAM (nao altera o arquivo no disco)\n\n\t- help\n\t\t// Exibe esta lista de comandos do sistema\n\n\t- exit\n\t\t// Permitir sair do programa principal e salvar os dados\n\n------------------------------------------------------------------------------------------------------------------------\n\n"
+	banner:			.asciiz "SAHJ-shell>> "
+	quebra_linha:		.asciiz "\n"
+	erro_msg:		.asciiz "Comando invalido!\n"
+	nome_arquivo:		.asciiz "dados.txt"
+	msg_save:		.asciiz "Alterações salvas com sucesso!\n"
+	titulo:			.asciiz "------------------------------\n      SISTEMA CONDOMÍNIO      \n------------------------------\n\n"
+	help_rsp:		.asciiz "\n------------------------------------------------------------------------------------------------------------------------\n                                                   COMANDOS DO SISTEMA                                                  \n------------------------------------------------------------------------------------------------------------------------\n\n\t- addMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento (ex: 101 a 1202)\n\t\t// <option2>: Nome completo do morador a ser adicionado (max: 6 por AP)\n\n\t- rmvMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Nome do morador a ser removido\n\n\t- addAuto --<option1> --<option2> --<option3> --<option4>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Tpo do veiculo ('c' para Carro [max 1] ou 'm' para Moto [max 2])\n\t\t// <option3>: Modelo do veiculo (ex: Fiat Uno)\n\t\t// <option4>: Placa do veiculo (ex: ABC1234)\n\n\t- rmvAuto --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Placa do veiculo a ser removido\n\n\t- limparAp --<option1>\n\t\t// <option1>: Numero do apartamento cujos dados serao apagados da memoria\n\n\t- infoAp --<option1>\n\t\t// <option1>: Numero do apartamento para exibir detalhes (moradores e veiculos)\n\n\t- infoGeral\n\t\t// Exibe estatisticas gerais do condominio (porcentagem de APs ocupados/vazios)\n\n\t- salvar\n\t\t// Salva os dados atuais contidos na memoria RAM para o arquivo 'dados.txt'\n\n\t- recarregar\n\t\t// Carrega e atualiza a memoria RAM com os dados salvos em 'dados.txt'\n\n\t- formatar\n\t\t// Limpa todos os dados da memoria RAM (nao altera o arquivo no disco)\n\n\t- help\n\t\t// Exibe esta lista de comandos do sistema\n\n\t- exit\n\t\t// Permitir sair do programa principal e salvar os dados\n\n------------------------------------------------------------------------------------------------------------------------\n\n"
+	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]: " 	# Mensagem de confirmação de salvamento
+	err_conf_msg:		.asciiz "Caractere invalido! Por favor digite apenas 'S' ou 'N'!\n"
+	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]: "
 	
 	# Comandos
 	cmd_addMorador:	.asciiz "addMorador"		# Comando para adicionar morador
@@ -420,28 +423,14 @@ infoGeral:
 
 salvar:
 	# Salva dados da memória no arquivo
-	# 1º Abrir o arquivo "dados.txt" para escrita
-	li $v0, 13		# Syscall para abri um arquivo
-	la $a0, nome_arquivo	# Caminho do arquivo ".txt" dos dados
-	li $a1, 1		# Flag para escrever no arquivo
-	li $a2, 0		# Modo
-	syscall
+	# 1º Preparar os registradores e chamar a função save_data
+	la $a0, nome_arquivo		# Filename do arquivo
+	la $a1, main_memory		# Buffer da memória principal
+	lw $a2, max_main_memory		# Número de bytes da memória principal
 	
-	move $t1, $v0		# Salva o file descriptor
+	jal save_data		# Função para salvar os dados			
 	
-	# 2º Salvar dados da main_memory para o arquivo dados.txt
-	li $v0, 15		# Syscall para escrever em um arquivo
-	move $a0, $t1		# Define o file descriptor
-	la $a1, main_memory	# Endereço do buffer da main_memory
-	lw $a2, max_main_memory	# Quantidade de bytes a serem escritos no arquivo
-	syscall
-	
-	# 3º Fechar o arquivo
-	li $v0, 16		# Syscall para fechar o arquivo
-	move $a0, $t1		# Define o file descriptor
-	syscall			
-	
-	# 4º Mensagem dizendo que os dados foram salvos
+	# 2º Mensagem dizendo que os dados foram salvos
 	li $v0, 4		# Syscall para imprimir na tela
 	la $a0, msg_save	# Mensagem dizendo que as alterações foram salvas
 	syscall
@@ -478,9 +467,33 @@ recarregar:
 formatar:
 	# Apaga todos os dados da memória, mas não do arquivo
 	# 1º Mensagem de confirmação
+	# Imprime mensagem de confirmação de formatação
+	li $v0, 4
+	la $a0, save_conf_msg
+	syscall
+
+form_conf_loop:
+	# Lê o caractere do usuário 'S' ou 's' (Sim) ou "N" ou 'n' (Não)
+	li $v0, 12
+	syscall
 	
-	# 2º Preparar argumentos
+	# Se o caractere lido for igual a 'S' ou 's', formata dados do programa
+	beq $v0, 83, formated
+	beq $v0, 115, formated
 	
+	# Se o caractere lido for igual a 'N' ou 'n', volta para o programa principal
+	beq $v0, 78, main_loop
+	beq $v0, 110, main_loop
+	
+	# Se o caractere lido for inválido, exibe uma mensagem de erro e volta a perguntar pelo caractere
+	li $v0, 4
+	la $a0, err_conf_msg
+	syscall
+	
+	j formatar 		# Volta pedindo confirmação novamente
+
+formated:
+	# 2º Preparar argumentos e executar a função	
 	la $a0, main_memory		# Endereço do buffer a ser limpo
 	lw $a1, max_main_memory		# Número de bytes a serem limpos
 	
@@ -502,14 +515,52 @@ help:
 exit:
 	# Permite sair do programa e salvar os dados
 	# 1º Mensagem de confirmação
+	# Imprime mensagem de confirmação de salvamento
+	li $v0, 4
+	la $a0, save_conf_msg
+	syscall
 	
-	# 2º Salvar dados antes de sair
+exit_conf_loop:
+	# Lê o caractere do usuário 'S' ou 's' (Sim) ou "N" ou 'n' (Não)
+	li $v0, 12
+	syscall
 	
-	# 3º Sair do simulador
+	# Se o caractere lido for igual a 'S' ou 's', sai do programa salvando os dados
+	beq $v0, 83, exit_save_confirmed
+	beq $v0, 115, exit_save_confirmed
+	
+	# Se o caractere lido for igual a 'N' ou 'n', sai do programa sem salvar os dados
+	beq $v0, 78, exit_no_save_confirmed
+	beq $v0, 110, exit_no_save_confirmed
+	
+	# Se o caractere lido for inválido, exibe uma mensagem de erro e volta a perguntar pelo caractere
+	li $v0, 4
+	la $a0, err_conf_msg
+	syscall
+	
+	j exit 		# Volta pedindo confirmação novamente
+	
+exit_save_confirmed:
+	# Salvar dados antes de sair
+	la $a0, nome_arquivo		# Filename do arquivo
+	la $a1, main_memory		# Buffer da memória principal
+	lw $a2, max_main_memory		# Número de bytes da memória principal
+	
+	jal save_data		# Executa a função
+	
+	# Mensagem dizendo que os dados foram salvos
+	li $v0, 4		# Syscall para imprimir na tela
+	la $a0, msg_save	# Mensagem dizendo que as alterações foram salvas
+	syscall
+	
+	# Sair do simulador
 	li $v0, 10		# Syscall para encerrar o simulador
 	syscall
 
-
+exit_no_save_confirmed:
+	# Sair do simulador sem salvar os dados
+	li $v0, 10		# Syscall para encerrar o simulador
+	syscall
 
 
 # -------------------------------------------------------
@@ -676,10 +727,39 @@ limpar_buffer_end:
 	# Volta para a função anterior
 	jr $ra
 
+# Função: save_data (file, buffer, num)
+# Função usada para salvar dados de um buffer me um arquivo
+# $a2 -> Número de bytes a serem salvos
+# $a1 -> Endereço do buffer
+# $a0 -> Endereço do nome do arquivo '.txt' (path)
 
-
-
-
-
+save_data:
+	# Salvar registradores na pilha
+	addi $sp, $sp, -8
+	sw $a1, 0($sp)
+	sw $a2, 4($sp)
+	
+	# Abre o arquivo ($a0 = nome do arquivo)
+	li $v0, 13		# Syscall para abrir um arquivo
+	li $a1, 1		# Flag para escrever no arquivo
+	li $a2, 0		# Modo
+	syscall
+	
+	# Salva file descriptor
+	move $t1, $v0
+	
+	# Recupera registradores
+	lw $a2, 4($sp)
+	lw $a1, 0($sp)
+	
+	# Escreve dados no arquivo ($a1 = buffer, $a2 = numero de bytes)
+	li $v0, 15		# Syscall para escrever em um arquivo
+	move $a0, $t1		# Define o file descriptor
+	syscall
+	
+	# Fecha o arquivo
+	li $v0, 16		# Syscall para fechar o arquivo
+	move $a0, $t1		# Define o file descriptor
+	syscall
 
 
