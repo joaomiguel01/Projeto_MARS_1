@@ -43,6 +43,8 @@
 	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]: " 	# Mensagem de confirmação de salvamento
 	err_conf_msg:		.asciiz "Caractere invalido! Por favor digite apenas 'S' ou 'N'!\n"
 	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]: "
+	nEncontrado:	.asciiz "Falha: morador nao encontrado\n"
+	
 	
 	# Comandos
 	cmd_addMorador:	.asciiz "addMorador"		# Comando para adicionar morador
@@ -379,6 +381,7 @@ guardar:
 	la $a1, cmd_option2 #manda a string de cmd_option2
 	move $a0, $t4 #guarda no slot de moradores
 	jal strcpy #copia
+	lb $t2, 385($s0) #pega o byte dos moradores
 	addi $t2, $t2, 1 #+1 no byte de quantidade de moradores
 	sb $t2, 385($s0) # grava a nova quantidade de moradores
 	addi $t5, $0, 1
@@ -404,15 +407,71 @@ nExiste:
 
 rmvMorador:
 	# Remove um morador de um AP
-	# 1º Verificar se os buffers option1 e option2 não estão vazios
-	# 2º Verificar se o número do AP existe
-	# 3º Verificar se o nome da pessoa existe no AP
-	# 4º Verificar se o número pessoas é maior que zero
-	# 5º Calcular o endereço de memória no AP
-	# 6º Remover o nome da pessoa no respectivo endereço
-	# 7º Caso o status do AP seja não vazio e só tenha 1 pessoa, mudar para vazio
+	# 1 Verificar se o buffer option2 nao esta vazio
+	la $t0, cmd_option2 #guarda a string
+	lb $t1, 0($t0) # pega o primeiro caracter
+	beq $t1, 0, nExiste #verifica se o nome esta vazio
+	beq $t1, 10, main_loop #se deu apenas enter, volta pro loop
 	
-	# Volta para a main
+	# 2 Verificar se o numero do AP existe
+	jal existeApt #verifica se o apt existe
+	bltz $v0, main_loop #caso nao, volta para o main
+	
+	# 3 Verificar se o apt possui moradores
+	move $s0, $v0 #salva o endereco do apt
+	lb $s1, 385($s0) #pega o byte dos moradores
+	beq $s1, 0, n_encontra_morador #verifica se esta vazio
+	
+	# 4 Verificar se o nome da pessoa existe no AP
+addi $s2, $0, 0 #contador
+move $s3, $s0 #copia para outro registrador 
+#$s1=$t2
+#$s2=$t3
+#$s3=$t4
+buscaMorador:
+	beq $s2, 6, n_encontra_morador #compara o contador
+	lb $t1, 0($s3) #pega o byte  
+	bnez $t1, compara #verifica se esta vazio
+	addi $s3, $s3, 64 #avanca para o proximo slot
+	addi $s2, $s2, 1 #adiciona o contador
+	j buscaMorador #volta o loop
+
+#verifica se o morador encontrado eh o mesmo de option2 
+compara:
+	la $a0, cmd_option2 # copia para $a0 o nome encontrado
+	move $a1, $s3 #copia para $a1 o nome desejado
+	jal strcmp #verifica se sao iguais
+	beqz $v0, remocao #caso sim, vai ser removido
+
+addContador: #caso nao, adiciona no contador e no ponteiro
+	addi $s3, $s3, 64 #avanca para o proximo slot
+	addi $s2, $s2, 1 #adiciona o contador
+	j buscaMorador #volta o loop
+	
+	# 5 remover e atualizar os bytes
+remocao:
+	move $a0, $s3 # Endereco do slot de 64 bytes do morador encontrado
+	li $a1, 64 # tamanho do slot 
+	jal limpar_buffer # zera os 64 bytes do morador
+	
+decrementa:
+	addi $s1, $s1, -1 # diminui 1 da quantidade de moradores
+	sb $s1, 385($s0) # grava a nova quantidade de moradores no byte 385
+	beqz $s1, vazio # se chegou a 0 moradores, vai para vazio
+	j main_loop # se nao, volta para o menu
+
+vazio:
+	sb $0, 384($s0) # grava a nova quantidade de moradores
+	addi $a0, $s0, 388 # endereco onde comecam os dados de automoveis
+	li $a1, 148 # total de bytes dos automoveis
+	jal limpar_buffer # apaga tudo dos automoveis
+	j main_loop
+	
+n_encontra_morador:
+	li $v0, 4 # Syscall para escrever string
+	la $a0, nEncontrado #imprime a mensagem de falha
+	syscall	
+	addi $v0, $0, -1 #manda para o retorno a falha
 	j main_loop
 
 addAuto:
