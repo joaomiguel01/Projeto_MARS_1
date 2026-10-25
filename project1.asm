@@ -762,4 +762,8 @@ save_data:
 	move $a0, $t1		# Define o file descriptor
 	syscall
 
-
+	# Alinhamento da pilha
+	addi $sp, $sp, 8
+	
+	# Retorno
+	jr $ra
