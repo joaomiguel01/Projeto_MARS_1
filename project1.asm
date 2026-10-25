@@ -40,6 +40,9 @@
 	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]: " 	# Mensagem de confirmação de salvamento
 	err_conf_msg:		.asciiz "Caractere invalido! Por favor digite apenas 'S' ou 'N'!\n"
 	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]: "
+	msg_limite_auto:        .asciiz "Falha: AP com numero max de automóveis\n"
+	msg_tipo_invalido:      .asciiz "Falha: tipo invalido\n"
+	msg_auto_nao_encontrado:    .asciiz "Falha: automóvel nao encontrado"
 	
 	# Comandos
 	cmd_addMorador:	.asciiz "addMorador"		# Comando para adicionar morador
@@ -90,9 +93,32 @@ main:
 	la $a0, titulo		# titulo a ser exibido
 	syscall
 	
-	# Verificar se o arquivo .txt já existe ou precisa ser criado (a fazer)
-	# Recarregar os últimos dados do arquivo para o programa
-	j recarregar
+	# Verificar se o arquivo .txt já existe ou precisa ser criado 
+	li $v0, 13             # abrir arquivo
+	la $a0, nome_arquivo   # entrega o nome dele
+ 	li $a1, 0              # modo (leitura)
+ 	syscall
+ 	
+ 	blt $v0, $0, criar_arquivo   # se $v0 for menor que zero, precisa ser criado.		
+ 	
+ 	move $a0, $v0       # entrega file descriptor para $a0
+ 	li $v0, 16          # fecha arquivo   
+ 	syscall
+ 	
+        # Recarregar os últimos dados do arquivo para o programa
+ 	j recarregar     
+ 	         	       
+        criar_arquivo:   
+	li $v0, 13             # criar arquivo (modo escrita, $a1 = 1)
+	la $a0, nome_arquivo   # entrega o nome dele
+ 	li $a1, 1              
+ 	syscall
+ 	
+ 	move $a0, $v0   # entrega o file descriptor para $a0
+ 	li $v0, 16      # fecha arquivo
+ 	syscall
+	j main_loop
+
 
 # Loop principal
 main_loop:
@@ -370,30 +396,185 @@ rmvMorador:
 	j main_loop
 
 addAuto:
-	# Adiciona um automóvel a um AP
-	# 1º Verificar se os buffers option1, option2, option3, option4 não estão vazios
-	# 2º Verificar se o número do AP existe
-	# 3º Verificar se o automóvel existe no AP
-	# 4º Verificar se o número pessoas é maior que zero
-	# 5º Verificar qual o tipo de automóvel
-	# 6º Verificar a quantidade de automóveis
-	# 7º Calcular o endereço de memória no AP
-	# 8º Salvar o automóvel no respectivo endereço
+	# Verifica se os buffers option1, option2, option3, option4 não estão vazios
+	la $t0, cmd_option1
+	lb $t1, 0($t0)
+	beq $t1, $0, erro_msg_vazio
 	
-	# Volta para a main
+	la $t0, cmd_option2
+	lb $t1, 0($t0)
+	beq $t1, $0, erro_msg_vazio
+	
+	la $t0, cmd_option3
+	lb $t1, 0($t0)
+	beq $t1, $0, erro_msg_vazio
+	
+	la $t0, cmd_option4
+	lb $t1, 0($t0)
+	beq $t1, $0, erro_msg_vazio
+			
+	
+	# Verifica se o número do AP existe
+	jal existeApt                    # Chama a função 
+	blt $v0, $zero, main_loop        # Se $v0 for menor que 0, o erro já foi impresso, volta pro menu.
+	move $s0, $v0                    # Se não, salva o endereço do AP em $s0.
+	
+	
+	# Verifica o tipo do automóvel e se ele existe no AP
+	verifica_tipo:
+	la $t0, cmd_option2   # carrega o endereço do tipo digitado
+	lb $t1, 0($t0)        # carrega o tipo 
+	lb $t2, 388($s0)      # carrega o tipo que ja existe no AP
+		
+	beq $t1, 99, verifica_se_tem_espaço     # checa se é um carro a ser adicionado, se for, checa se ja tem espaço no AP
+	beq $t1, 109, verifica_se_tem_2_motos   # se não for carro, checa se é moto, se for, checa se tem 2 motos no AP
+	
+	tipo_invalido:      # se não for carro nem moto, printa mensagem de tipo inválido
+	li $v0, 4	 
+	la $a0, msg_tipo_invalido		 
+	syscall
+	j main_loop
+		
+	                                   	                                   	                                   	                                   	
+	verifica_se_tem_espaço:                    
+	bne $t2, 0, aviso_limite        # se não estiver vazio, ja nao da pra adicionar o carro, avisa que não dá.
+	j adiciona_carro                # se estiver vazio, adiciona
+	 	                                
+	                                                              
+	verifica_se_tem_2_motos: 
+	lb $t3, 389($s0)              # carrega quantidade de veiculos
+	beq $t2, 99, aviso_limite     # verifica se o tipo la dentro é um carro, se for, ja ta no limite
+	bgeu $t3, 2, aviso_limite     # se houver 2 motos, avisa que não da para adicionar
+	j adiciona_moto               # se houver menos que duas, adiciona
+	
+	 
+	
+        adiciona_carro: 
+	li $t4, 99
+	sb $t4, 388($s0)        # atualiza o tipo salvando 'c' no byte 388 do AP
+	li $t4, 1
+	sb $t4, 389($s0)        # atualiza a quantidade no byte 389 do AP
+	
+        addi $a0, $s0, 390      # Destino: endereço do AP + 390
+	la $a1, cmd_option3     # Origem: modelo digitado
+	jal strcpy
+	
+	addi $a0, $s0, 454      # Destino: endereço do AP + 454
+	la $a1, cmd_option4     # Origem: placa digitada
+	jal strcpy                         	
+        
+        j main_loop
+                
+        
+        adiciona_moto:
+	li $t4, 109
+	sb $t4, 388($s0)        # atualiza o tipo salvando 'm' no byte 388 do AP
+	lb $t3, 389($s0)        # Lê a quantidade atual de motos 
+	addi $t3, $t3, 1        # Soma 1
+	sb $t3, 389($s0)        # Salva a nova quantidade no byte 389
+	
+	lb $t4, 390($s0)            # Olha a primeira letra do modelo da Vaga 1
+	bne $t4, $zero, moto_vaga2  # Se não for zero, a vaga 1 está ocupada, vai pra vaga 2
+	
+	                             
+	addi $a0, $s0, 390          # Se chegou aqui, a vaga 1 está livre, copia modelo para o destino
+	la $a1, cmd_option3         # Origem 
+	jal strcpy
+	
+	addi $a0, $s0, 454         # Destino
+	la $a1, cmd_option4        # Origem
+	jal strcpy
+	j main_loop
+
+        moto_vaga2:
+	addi $a0, $s0, 464      # Destino: endereço do AP + 464
+	la $a1, cmd_option3     # Origem: modelo digitado
+	jal strcpy
+	
+	addi $a0, $s0, 528      # Destino: endereço do AP + 528
+	la $a1, cmd_option4     # Origem: placa digitada
+	jal strcpy
+        j main_loop
+        
+        
+            
+        aviso_limite:
+        li $v0, 4		      # Syscall para escrever string
+	la $a0, msg_limite_auto       # msg a ser exibida
+	syscall
+	j main_loop
+	
+	erro_msg_vazio:
+	li $v0, 4	 
+	la $a0, erro_msg		 
+	syscall 
 	j main_loop
 
 rmvAuto:
-	# Remove um automóvel de um AP
-	# 1º Verificar se os buffers option1 e option2 não estão vazios
-	# 2º Verificar se o número do AP existe
-	# 3º Verificar se o automóvel existe no AP
-	# 4º Calcular o endereço de memória no AP
-	# 5º Remover o automóvel no respectivo endereço
-	# 6º Atualizar o número de automóveis
 	
-	# Volta para a main
+	# Verifica se os buffers option1 e option2 não estão vazios
+	la $t0, cmd_option1
+	lb $t1, 0($t0)
+	beq $t1, $0, erro_msg
+	
+	la $t0, cmd_option2
+	lb $t1, 0($t0)
+	beq $t1, $0, erro_msg
+	
+	# Verifica se o número do AP existe
+	jal existeApt                   # Chama a função 
+	blt $v0, $zero, main_loop       # Se $v0 for menor que 0, o erro já foi impresso, volta pro menu.
+	move $s0, $v0                   # Salva o endereço do AP em $s0.
+	
+	# Verificar se existe um automovel no AP
+	lb $t0, 389($s0)
+	beq $t0, $zero, auto_nao_encontrado  # Se for 0, não tem o que remover
+	
+	
+	addi $a0, $s0, 454                 # $a0 = endereço da placa da vaga 1
+	la $a1, cmd_option2                # $a1 = placa digitada pelo usuário
+	jal strcmp                         # Compara as duas strings
+	beq $v0, $zero, remover_vaga1      # Se $v0 = 0, as placas são iguais, vai apagar a vaga 1
+	
+	addi $a0, $s0, 528                 # $a0 = endereço da placa da vaga 2
+	la $a1, cmd_option2                # $a1 = placa digitada pelo usuário
+	jal strcmp                         # Compara as duas strings
+	beq $v0, $zero, remover_vaga2      # Se $v0 = 0, achou na vaga 2, vai apagar a vaga 2
+	
+	j auto_nao_encontrado
+	
+        
+        
+        remover_vaga1:
+	addi $a0, $s0, 390                 # início da vaga 1 
+	li $a1, 74                         # 74 bytes para zerar (64 do modelo + 10 da placa)
+	jal limpar_buffer
+	j atualizar_qtd_auto
+
+        remover_vaga2:
+	addi $a0, $s0, 464                 # início da vaga 2 
+	li $a1, 74                         # 74 bytes para zerar
+	jal limpar_buffer
+
+        atualizar_qtd_auto:
+	lb $t0, 389($s0)                   # lê a quantidade atual de veículos
+	addi $t0, $t0, -1                  # diminui 1 veículo
+	sb $t0, 389($s0)                   # salva a nova quantidade no byte 389
+	
+	# se ainda sobrou 1 moto, já pode voltar pro menu:
+	bne $t0, $zero, main_loop
+	
+	# se a quantidade chegou a 0, reseta o tipo de veículo (byte 388) para 0 também
+	sb $zero, 388($s0)
 	j main_loop
+        
+        
+        auto_nao_encontrado:
+	li $v0, 4	 
+	la $a0, msg_auto_nao_encontrado		 
+	syscall 
+	j main_loop
+		
 
 limparAp:
 	# Apaga dados do AP na memória
