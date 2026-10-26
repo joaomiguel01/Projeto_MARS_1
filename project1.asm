@@ -516,10 +516,10 @@ rmvAuto:
 limparAp:
 	# Apaga dados do AP na memória
 	
-	# 1º Verificar se o número do AP existe (existeApt já trata option 1 vazia)
+	# 1º Verificar se o número do AP existe (existeApt já trata option1 vazia)
 	
 	jal existeApt # Converte option1 no endereço do AP ($v0) ou devolve -1
-	bltz $v0, main_loop # AP inválido: existeApt já imprimmiu a mensagem de falha
+	bltz $v0, main_loop # AP inválido, existeApt já imprimiu a mensagem de falha
 	
 	# 2º Guardar endereço do AP e o andar/quarto 
 	move $s0,$v0 # $s0 = endereço do AP
@@ -550,8 +550,8 @@ infoAp:
 	lb $t1, 2($t0) # 3º caractere digitado
 	bne $t1, 108, infoAp_um # Não é "l" (108), trata como número de AP
 	lb $t1, 3($t0) # 4º caractere digitado (encerra a palavra)
-	beq $t1, $zero, infoAp_all # "\0', exatamente all
-	beq $t1, 32, infoAp_all # Espaço: "all" (o parser deixa o espaço se houver outra opção)
+	beq $t1, $zero, infoAp_all # "\0", exatamente all
+	beq $t1, 32, infoAp_all # Espaço,"all" (o parser deixa o espaço se houver outra opção)
 	beq $t1, 10, infoAp_all # Quebra de linha também encerra a palavra
 	
 infoAp_um:
@@ -568,53 +568,50 @@ infoAp_um:
 	j main_loop # Fim do comando
 infoAp_all:
 	# Percorre os 24 APs em ordem crescente (101,102,201...1202)
-	li $s2, 0 # $s2 = índice do AP (0 a 23)
+	li $s2, 0 # $s2 = indice do AP (0 a 23)
 infoAp_all_loop:
 	beq $s2,24,main_loop # Passou pelos 24 Aps, volta para o terminal
-	# Número do AP = (índice/2+1)*100 +(indice%2+1)
+	# Número do AP = (indice/2+1)*100 +(indice%2+1)
 	
-	srl $t0, $s2, 1	 # índice / 2
+	srl $t0, $s2, 1	 # indice / 2
 	addi $t0, $t0, 1 # $t0 = andar (1 a 12)
 	li $t1, 100 # Multiplicador para formar o número
 	multu $t0, $t1 # andar * 100
 	mflo $t0 # $t0 = andar * 100
-	andi $t2, $s2, 1 # índice % 2
+	andi $t2, $s2, 1 # indice % 2
 	addi $t2, $t2, 1 # $t2 = quarto (1 ou 2)
-	add $a1, $t0, $t2 # $a1 = número do AP (ex: 1102)
+	add $a1, $t0, $t2 # $a1 = número do AP (ex 1102)
 	
 	# Endereço do AP = main_memory + indice * 537
-	
-	multu $s2, $t3 # índice * 537
+	li $t3, 537 # $t3= 537
+	multu $s2, $t3 # indice * 537
 	mflo $t3 # $t3 = deslocamento dentro da main_memory
-	la $t4, main_memory # $t4 = início da tabela de APs
+	la $t4, main_memory # $t4 = inicio da tabela de APs
 	add $a0, $t3, $t4 # $a0 = endereço do AP atual
 	
 	jal imprimir_ap	 # Imprime o AP atual ($a0 = endereço, $a1 = número)
 	
 	# Linha em branco separando um AP do outro
 	
-	li $v0, 4 # Syscall para imprimir string
-	la $a0, quebra_linha # String "\n"
-	syscall	# Imprime a linha em branco
+	li $v0, 4 # Syscall para printar string
+	la $a0, quebra_linha 
+	syscall
 	
 	addi $s2, $s2, 1 # Próximo AP
 	j infoAp_all_loop # Repete o laço
-	
-	
-	
-
 infoGeral:
 	# Informações gerais dos APs
+	
 	# 1º Contar quantos dos 24 APs estão não vazios (Byte 384)
 	la $t0, main_memory # $t0 = endereço do AP atual (começa pelo primeiro)
 	
-	li $t1,0 # $t1 = índice do AP
+	li $t1,0 # $t1 = indice do AP
 	li, $t2,0 # $t2 = contador de APs não vazios
 infoGeral_loop:
 	beq $t1, 24, infoGeral_calc # Calcula a porcentagem dos 24 apartamentos
 	lb $t3 384($t0) # $t3 = status do AP (0 vazio, 1 não vazio)
 	beq $t3, $zero, infoGeral_prox # Se for vazio, não conta
-	addi $t2,$t2,1 # Soma andares não vazios
+	addi $t2,$t2,1 # Soma APs não vazios
 infoGeral_prox:
 	addi $t0, $t0, 537 # Avança para o próximo AP 
 	addi $t1, $t1, 1 # Próximo  indice
@@ -626,7 +623,7 @@ infoGeral_calc:
 	sub $t5, $t4, $t2  # $t5 = AP vazios (24 - não vazios)
 	li $t6,100 # Fator transforma em porcentagem
 	multu $t2, $t6  # Não vazios * 100
-	mflo $t7 # $t7 = $t2
+	mflo $t7 # $t7 = Não vazios * 100
 	addi $t7, $t7, 12 # +12 para arredondar o calculo
 	div $t7, $t4 # Divide por 24 (quociente em LO)
 	mflo $t7 # $t7 = % de não vazios
@@ -634,10 +631,10 @@ infoGeral_calc:
 	
 	# 3º Imprime Não Vazios e Porcentagem 
 	
-	li $v0, 4 # Syscall de print string
+	li $v0, 4 # Syscall de printar string
 	la $a0, msg_nao_vazios 
 	syscall
-	li $v0,1 # Syscall de print inteiro
+	li $v0,1 # Syscall de printar inteiro
 	move $a0, $t2 # Quantidade de APs não vazios
 	syscall 
 	li $v0,4 # Mesma coisa do primeiro syscall
@@ -652,10 +649,10 @@ infoGeral_calc:
 	
 	# 4º Imprime Vazios
 	
-	li $v0,4 # Syscall de print string
+	li $v0,4 # Syscall de printar string
 	la $a0, msg_vazios 
 	syscall
-	li $v0,1 # Syscall de print inteiro
+	li $v0,1 # Syscall de printar inteiro
 	move $a0, $t5 # Quantidade de APs vazios
 	syscall
 	li $v0, 4 # Mesma coisa do primeiro syscall
@@ -1046,14 +1043,9 @@ invalido:
 	
 	# Função: imprimir_ap (endereço, número)
 # Imprime as informações de um AP no padrão do cmd_6 (infoAp)
-# $a1 -> Número do AP (ex: 1102)
+# $a1 -> Número do AP (ex 1102)
 # $a0 -> Endereço do AP dentro da main_memory
-# Layout assumido para os automóveis (addAuto/rmvAuto devem seguir o mesmo):
-# byte 388: tipo ("c" = 99 ou "m" = 109)
-# byte 389: quantidade de automóveis
-# A partir do byte 390: slots de 73 bytes, um por automóvel
-# slot + 0  : modelo (string terminada em "\0", até 56 bytes)
-# slot + 56 : placa  (string terminada em "\0", até 17 bytes)
+
 
 imprimir_ap:
 	move $t0, $a0 # $t0 = endereço do AP
@@ -1067,7 +1059,7 @@ imprimir_ap:
 	li $v0, 1 # Syscall para printar inteiro
 	move $a0, $t1 # Número do AP
 	syscall 
-	li $v0, 4 # # Mesma coisa do primeiro syscall
+	li $v0, 4 # Mesma coisa do primeiro syscall
 	la $a0, quebra_linha 
 	syscall	 
 	
@@ -1106,9 +1098,10 @@ imprimir_morador_prox:
 
 imprimir_autos:
 	lb $t5, 389($t0) # $t5 = quantidade de automóveis
-	beq $t5, $zero, imprimir_ap_fim	 # Sem automóveis: nada a mostrar
+	beq $t5, $zero, imprimir_ap_fim	 # Sem automóveis, nada a mostrar
 	
 	# Carro ou Moto, conforme o tipo
+	
 	lb $t6, 388($t0) # $t6 = tipo do automóvel
 	beq $t6, 99, imprimir_rotulo_carro # 99 = "c", é carro
 	li $v0, 4 # Syscall para printar string
