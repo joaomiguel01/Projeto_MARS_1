@@ -45,6 +45,19 @@
 	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]: "
 	nEncontrado:	.asciiz "Falha: morador nao encontrado\n"
 	
+	# Mensagens do infoAp / infoGeral
+	msg_ap:			.asciiz "AP: "			# Prefixo do cabeçalho: "AP: 101"
+	msg_ap_vazio:		.asciiz "Apartamento vazio\n"	# Texto exibido quando o AP não tem moradores
+	msg_moradores:		.asciiz "Moradores:\n"		# Título da lista de moradores
+	msg_carro:		.asciiz "Carro:\n"		# Título da seção de carro
+	msg_moto:		.asciiz "Moto:\n"		# Título da seção de motos
+	msg_tab:		.asciiz "\t"			# Recuo antes de cada linha de veículo
+	msg_barra:		.asciiz " / "			# Separador entre modelo e placa
+	msg_nao_vazios:		.asciiz "Nao vazios: "		# Rótulo da linha de APs não vazios
+	msg_vazios:		.asciiz "Vazios:     "		# Rótulo da linha de APs vazios 
+	msg_abre_par:		.asciiz " ("			# Abre o parêntese 
+	msg_fecha_par:		.asciiz "%)\n"			# Fecha o parêntese, mostra % e quebra a linha
+	
 	
 	# Comandos
 	cmd_addMorador:	.asciiz "addMorador"		# Comando para adicionar morador
@@ -502,27 +515,159 @@ rmvAuto:
 
 limparAp:
 	# Apaga dados do AP na memória
-	# 1º Verificar se o buffer option1 não está vazio
-	# 2º Verificar se o número do AP existe
-	# 3º Limpar todo o AP na memória e no arquivo
+	
+	# 1º Verificar se o número do AP existe (existeApt já trata option 1 vazia)
+	
+	jal existeApt # Converte option1 no endereço do AP ($v0) ou devolve -1
+	bltz $v0, main_loop # AP inválido: existeApt já imprimmiu a mensagem de falha
+	
+	# 2º Guardar endereço do AP e o andar/quarto 
+	move $s0,$v0 # $s0 = endereço do AP
+	lb $s1, 386($s0) # $s1 = andar, que é apagado junto ao bloco
+	lb $s2, 387($s0) # $s2 = quarto, que é apagado junto com o bloco
+	
+	# 3º Zerar os 537 bytes do AP (incluindo moradores, status, quantidades e automóveis)
+	move $a0, $s0 # $a0 = início do bloco a limpar
+	li $a1, 537 # $a1 = tamanho de um AP em bytes
+	jal limpar_buffer # Zera todos os bytes 
+	
+	# 4º Restaura andar/quarto, o AP volta ao estado  vazio (status = 0)
+	sb $s1, 386($s0) # Regrava o andar
+	sb $s2, 387($s0) # Regrava o quarto
 	
 	# Volta para a main
 	j main_loop
-
 infoAp:
 	# Informações sobre o um AP
-	# 1º Verificar se o buffer option1 não está vazio
-	# 2º Verificar se o número do AP existe
-	# 3º Caso o AP não esteja vazio, listar informações
-	# 4º Caso contrário, imprimir o número do AP e seu status de vazio
-		
+	
+	# Verificar se option1 for "all", mostrar todos os APs
+	
+	la $t0, cmd_option1 # $t0 = endereço do buffer da option1
+	lb $t1, 0($t0) # 1º caractere digitado
+	bne $t1, 97, infoAp_um # Não é "a" (97), trata como número de AP
+	lb $t1, 1($t0) # 2º caractere digitado	
+	bne $t1, 108, infoAp_um # Não é "l" (108), trata como número de AP
+	lb $t1, 2($t0) # 3º caractere digitado
+	bne $t1, 108, infoAp_um # Não é "l" (108), trata como número de AP
+	lb $t1, 3($t0) # 4º caractere digitado (encerra a palavra)
+	beq $t1, $zero, infoAp_all # "\0', exatamente all
+	beq $t1, 32, infoAp_all # Espaço: "all" (o parser deixa o espaço se houver outra opção)
+	beq $t1, 10, infoAp_all # Quebra de linha também encerra a palavra
+	
+infoAp_um:
+	# Verificar se o número do AP existe (se vazia, existeApt resolve)
+	
+	jal existeApt
+	bltz $v0, main_loop
+	# 3º Imprimir o AP  ($v0 = endereço, $v1 = número do AP)
+	move $a0, $v0	# 1º argumento de imprimir (endereço)
+	move $a1, $v1	# 2º argumento de imprimir (número do AP)
+	jal imprimir_ap # Imprime vazio OU moradores + veículos
+	
 	# Volta para a main
-	j main_loop
+	j main_loop # Fim do comando
+infoAp_all:
+	# Percorre os 24 APs em ordem crescente (101,102,201...1202)
+	li $s2, 0 # $s2 = índice do AP (0 a 23)
+infoAp_all_loop:
+	beq $s2,24,main_loop # Passou pelos 24 Aps, volta para o terminal
+	# Número do AP = (índice/2+1)*100 +(indice%2+1)
+	
+	srl $t0, $s2, 1	 # índice / 2
+	addi $t0, $t0, 1 # $t0 = andar (1 a 12)
+	li $t1, 100 # Multiplicador para formar o número
+	multu $t0, $t1 # andar * 100
+	mflo $t0 # $t0 = andar * 100
+	andi $t2, $s2, 1 # índice % 2
+	addi $t2, $t2, 1 # $t2 = quarto (1 ou 2)
+	add $a1, $t0, $t2 # $a1 = número do AP (ex: 1102)
+	
+	# Endereço do AP = main_memory + indice * 537
+	
+	multu $s2, $t3 # índice * 537
+	mflo $t3 # $t3 = deslocamento dentro da main_memory
+	la $t4, main_memory # $t4 = início da tabela de APs
+	add $a0, $t3, $t4 # $a0 = endereço do AP atual
+	
+	jal imprimir_ap	 # Imprime o AP atual ($a0 = endereço, $a1 = número)
+	
+	# Linha em branco separando um AP do outro
+	
+	li $v0, 4 # Syscall para imprimir string
+	la $a0, quebra_linha # String "\n"
+	syscall	# Imprime a linha em branco
+	
+	addi $s2, $s2, 1 # Próximo AP
+	j infoAp_all_loop # Repete o laço
+	
+	
+	
 
 infoGeral:
 	# Informações gerais dos APs
-	# 1º Informaçõs da porcentagem de APs vazios e APs não vazios
-		
+	# 1º Contar quantos dos 24 APs estão não vazios (Byte 384)
+	la $t0, main_memory # $t0 = endereço do AP atual (começa pelo primeiro)
+	
+	li $t1,0 # $t1 = índice do AP
+	li, $t2,0 # $t2 = contador de APs não vazios
+infoGeral_loop:
+	beq $t1, 24, infoGeral_calc # Calcula a porcentagem dos 24 apartamentos
+	lb $t3 384($t0) # $t3 = status do AP (0 vazio, 1 não vazio)
+	beq $t3, $zero, infoGeral_prox # Se for vazio, não conta
+	addi $t2,$t2,1 # Soma andares não vazios
+infoGeral_prox:
+	addi $t0, $t0, 537 # Avança para o próximo AP 
+	addi $t1, $t1, 1 # Próximo  indice
+	j infoGeral_loop
+infoGeral_calc:
+	# 2º Calcular os números
+	
+	li $t4,24 # $t4 = total de APs
+	sub $t5, $t4, $t2  # $t5 = AP vazios (24 - não vazios)
+	li $t6,100 # Fator transforma em porcentagem
+	multu $t2, $t6  # Não vazios * 100
+	mflo $t7 # $t7 = $t2
+	addi $t7, $t7, 12 # +12 para arredondar o calculo
+	div $t7, $t4 # Divide por 24 (quociente em LO)
+	mflo $t7 # $t7 = % de não vazios
+	sub $t8, $t6, $t7 # $t8 = % de vazios
+	
+	# 3º Imprime Não Vazios e Porcentagem 
+	
+	li $v0, 4 # Syscall de print string
+	la $a0, msg_nao_vazios 
+	syscall
+	li $v0,1 # Syscall de print inteiro
+	move $a0, $t2 # Quantidade de APs não vazios
+	syscall 
+	li $v0,4 # Mesma coisa do primeiro syscall
+	la $a0, msg_abre_par # Abre parenteses
+	syscall 
+	li $v0,1 # Mesma coisa do segundo syscall
+	move $a0, $t7 # % de não vazios
+	syscall 
+	li $v0,4 # Mesma coisa do primeiro syscall
+	la,$a0, msg_fecha_par # %, fecha parenteses e quebra linha
+	syscall 
+	
+	# 4º Imprime Vazios
+	
+	li $v0,4 # Syscall de print string
+	la $a0, msg_vazios 
+	syscall
+	li $v0,1 # Syscall de print inteiro
+	move $a0, $t5 # Quantidade de APs vazios
+	syscall
+	li $v0, 4 # Mesma coisa do primeiro syscall
+	la $a0, msg_abre_par # Abre parenteses
+	syscall
+	li $v0,1 # Mesma coisa do segundo syscall
+	move $a0, $t8 # % de vazios 
+	syscall 
+	li $v0,4 # Mesma coisa do primeiro syscall
+	la $a0, msg_fecha_par # %, fecha parenteses e quebra linha
+	syscall
+	
 	# Volta para a main
 	j main_loop
 
@@ -898,6 +1043,116 @@ invalido:
 	syscall	
 	addi $v0, $0, -1 #manda para o retorno a falha
 	jr $ra
+	
+	# Função: imprimir_ap (endereço, número)
+# Imprime as informações de um AP no padrão do cmd_6 (infoAp)
+# $a1 -> Número do AP (ex: 1102)
+# $a0 -> Endereço do AP dentro da main_memory
+# Layout assumido para os automóveis (addAuto/rmvAuto devem seguir o mesmo):
+# byte 388: tipo ("c" = 99 ou "m" = 109)
+# byte 389: quantidade de automóveis
+# A partir do byte 390: slots de 73 bytes, um por automóvel
+# slot + 0  : modelo (string terminada em "\0", até 56 bytes)
+# slot + 56 : placa  (string terminada em "\0", até 17 bytes)
+
+imprimir_ap:
+	move $t0, $a0 # $t0 = endereço do AP
+	move $t1, $a1 # $t1 = número do AP
+	
+	# Imprime Ap e Número
+	
+	li $v0, 4 # Syscall para printar string
+	la $a0, msg_ap # "AP: "
+	syscall 
+	li $v0, 1 # Syscall para printar inteiro
+	move $a0, $t1 # Número do AP
+	syscall 
+	li $v0, 4 # # Mesma coisa do primeiro syscall
+	la $a0, quebra_linha 
+	syscall	 
+	
+	# Se o status for 0, o AP está vazio
+	lb $t4, 384($t0) # $t4 = status do AP
+	bne $t4, $zero, imprimir_ap_cheio # Status != 0, tem moradores, segue para listar
+	li $v0, 4 # Syscall para printar string
+	la $a0, msg_ap_vazio		
+	syscall
+	jr $ra # Volta pra quem chamou
+
+imprimir_ap_cheio:
+	# Printa um morador por linha (percorre os 6 slots de 64 bytes)
+	
+	li $v0, 4 # Syscall para printar string
+	la $a0, msg_moradores		
+	syscall	
+	li $t2, 0 # $t2 = slot atual (0 a 5)
+	move $t3, $t0 # $t3 = ponteiro do slot (começa no byte 0 do AP)
+	
+imprimir_moradores_loop:
+	beq $t2, 6, imprimir_autos # Percorreu os 6 slots, vai para os veículos
+	lb $t4, 0($t3) # Primeiro byte do slot
+	beq $t4, $zero, imprimir_morador_prox # 0 = slot livre, pula
+	li $v0, 4 # Syscall para printar string
+	move $a0, $t3 # Endereço do nome no slot
+	syscall
+	li $v0, 4 # Mesma coisa que o primeiro syscall
+	la $a0, quebra_linha 
+	syscall	
+	
+imprimir_morador_prox:
+	addi $t3, $t3, 64 # Avança 64 bytes até o próximo slot
+	addi $t2, $t2, 1 # Conta mais um slot
+	j imprimir_moradores_loop # Volta pro laço
+
+imprimir_autos:
+	lb $t5, 389($t0) # $t5 = quantidade de automóveis
+	beq $t5, $zero, imprimir_ap_fim	 # Sem automóveis: nada a mostrar
+	
+	# Carro ou Moto, conforme o tipo
+	lb $t6, 388($t0) # $t6 = tipo do automóvel
+	beq $t6, 99, imprimir_rotulo_carro # 99 = "c", é carro
+	li $v0, 4 # Syscall para printar string
+	la $a0, msg_moto 
+	syscall	 
+	j imprimir_autos_lista # Pula o rótulo do carro
+	
+imprimir_rotulo_carro:
+	li $v0, 4 # Syscall para printar string
+	la $a0, msg_carro 
+	syscall	
+	
+imprimir_autos_lista:
+	addi $t3, $t0, 390 # $t3 = primeiro slot de automóvel (byte 390 do AP)
+	li $t2, 0# $t2 = automóvel atual
+	
+imprimir_autos_loop:
+	beq $t2, $t5, imprimir_ap_fim # Imprimiu todos os automóveis, termina
+	
+	# Modelo e Placa
+	
+	li $v0, 4 # Syscall para printar string
+	la $a0, msg_tab	
+	syscall	
+	li $v0, 4 # Mesma coisa que o primeiro syscall
+	move $a0, $t3 # Modelo está no início do slot (+0)
+	syscall					
+	li $v0, 4 # Mesma coisa que o primeiro syscall
+	la $a0, msg_barra		
+	syscall					
+	li $v0, 4 # Mesma coisa que o primeiro syscall
+	addi $a0, $t3, 56 # Placa está em slot + 56
+	syscall
+	li $v0, 4 # Syscall para printar string
+	la $a0, quebra_linha			
+	syscall	 
+	
+	addi $t3, $t3, 73 # Avança 73 bytes até o próximo slot de automóvel
+	addi $t2, $t2, 1 # Conta mais um automóvel
+	j imprimir_autos_loop # Volta para o laço
+
+imprimir_ap_fim:
+	jr $ra # Volta para quem chamou
+
 
 
 
