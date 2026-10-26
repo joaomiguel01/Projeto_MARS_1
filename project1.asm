@@ -1,4 +1,4 @@
-# Nomes: João Miguel Oliveira de Carvalho, Alicia Maria de S. M. Gomes
+# Nomes: João Miguel Oliveira de Carvalho, Alicia Maria de S. M. Gomes, Silas Silva de Azevedo, Hector Henrique Silva Pereira
 # Data: 16/10/2026
 # Atividade: 1 VA
 # Disciplina: Arquitetura e Organização de Computadores
@@ -34,7 +34,7 @@
 	quebra_linha:	.asciiz "\n"
 	erro_msg:	.asciiz "Comando invalido\n"
 	nome_arquivo:	.asciiz "dados.txt"
-	msg_save:	.asciiz "Alterações salvas com sucesso!\n"
+	msg_save:	.asciiz "Alteracoes salvas com sucesso!\n"
 	titulo:		.asciiz "------------------------------\n      SISTEMA CONDOMINIO      \n------------------------------\n\n"
 	help_rsp:	.asciiz "\n------------------------------------------------------------------------------------------------------------------------\n                                                   COMANDOS DO SISTEMA                                                  \n------------------------------------------------------------------------------------------------------------------------\n\n\t- addMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento (ex: 101 a 1202)\n\t\t// <option2>: Nome completo do morador a ser adicionado (max: 6 por AP)\n\n\t- rmvMorador --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Nome do morador a ser removido\n\n\t- addAuto --<option1> --<option2> --<option3> --<option4>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Tpo do veiculo ('c' para Carro [max 1] ou 'm' para Moto [max 2])\n\t\t// <option3>: Modelo do veiculo (ex: Fiat Uno)\n\t\t// <option4>: Placa do veiculo (ex: ABC1234)\n\n\t- rmvAuto --<option1> --<option2>\n\t\t// <option1>: Numero do apartamento\n\t\t// <option2>: Placa do veiculo a ser removido\n\n\t- limparAp --<option1>\n\t\t// <option1>: Numero do apartamento cujos dados serao apagados da memoria\n\n\t- infoAp --<option1>\n\t\t// <option1>: Numero do apartamento para exibir detalhes (moradores e veiculos)\n\n\t- infoGeral\n\t\t// Exibe estatisticas gerais do condominio (porcentagem de APs ocupados/vazios)\n\n\t- salvar\n\t\t// Salva os dados atuais contidos na memoria RAM para o arquivo 'dados.txt'\n\n\t- recarregar\n\t\t// Carrega e atualiza a memoria RAM com os dados salvos em 'dados.txt'\n\n\t- formatar\n\t\t// Limpa todos os dados da memoria RAM (nao altera o arquivo no disco)\n\n\t- help\n\t\t// Exibe esta lista de comandos do sistema\n\n\t- exit\n\t\t// Permitir sair do programa principal e salvar os dados\n\n------------------------------------------------------------------------------------------------------------------------\n\n"
 	apt_invalido:   .asciiz "Falha: AP invalido\n"
@@ -43,9 +43,9 @@
 	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]: " 	# Mensagem de confirmação de salvamento
 	err_conf_msg:		.asciiz "Caractere invalido! Por favor digite apenas 'S' ou 'N'!\n"
 	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]: "
-	msg_limite_auto:        .asciiz "Falha: AP com numero max de automóveis\n"
+	msg_limite_auto:        .asciiz "Falha: AP com numero max de automoveis\n"
 	msg_tipo_invalido:      .asciiz "Falha: tipo invalido\n"
-	msg_auto_nao_encontrado:    .asciiz "Falha: automóvel nao encontrado"
+	msg_auto_nao_encontrado:    .asciiz "Falha: automovel nao encontrado\n"
 
 	nEncontrado:	.asciiz "Falha: morador nao encontrado\n"
 	
@@ -546,7 +546,7 @@ addAuto:
 	lb $t1, 0($t0)        # carrega o tipo 
 	lb $t2, 388($s0)      # carrega o tipo que ja existe no AP
 		
-	beq $t1, 99, verifica_se_tem_espaço     # checa se é um carro a ser adicionado, se for, checa se ja tem espaço no AP
+	beq $t1, 99, verifica_se_tem_espaco     # checa se é um carro a ser adicionado, se for, checa se ja tem espaço no AP
 	beq $t1, 109, verifica_se_tem_2_motos   # se não for carro, checa se é moto, se for, checa se tem 2 motos no AP
 	
 	tipo_invalido:      # se não for carro nem moto, printa mensagem de tipo inválido
@@ -556,7 +556,7 @@ addAuto:
 	j main_loop
 		
 	                                   	                                   	                                   	                                   	
-	verifica_se_tem_espaço:                    
+	verifica_se_tem_espaco:                    
 	bne $t2, 0, aviso_limite        # se não estiver vazio, ja nao da pra adicionar o carro, avisa que não dá.
 	j adiciona_carro                # se estiver vazio, adiciona
 	 	                                
@@ -635,11 +635,11 @@ rmvAuto:
 	# Verifica se os buffers option1 e option2 não estão vazios
 	la $t0, cmd_option1
 	lb $t1, 0($t0)
-	beq $t1, $0, erro_msg
+	beq $t1, $0, erro_msg_vazio
 	
 	la $t0, cmd_option2
 	lb $t1, 0($t0)
-	beq $t1, $0, erro_msg
+	beq $t1, $0, erro_msg_vazio
 	
 	# Verifica se o número do AP existe
 	jal existeApt                   # Chama a função 
@@ -899,7 +899,7 @@ formatar:
 	# 1º Mensagem de confirmação
 	# Imprime mensagem de confirmação de formatação
 	li $v0, 4
-	la $a0, save_conf_msg
+	la $a0, form_conf_msg
 	syscall
 
 form_conf_loop:
@@ -1302,7 +1302,9 @@ imprimir_autos_lista:
 	li $t2, 0# $t2 = automóvel atual
 	
 imprimir_autos_loop:
-	beq $t2, $t5, imprimir_ap_fim # Imprimiu todos os automóveis, termina
+	beq $t2, 2, imprimir_ap_fim # Imprimiu todos os automóveis, termina
+	lb $t4, 0($t3)
+	beq $t4, $zero, prox_vaga_auto
 	
 	# Modelo e Placa
 	
@@ -1316,15 +1318,20 @@ imprimir_autos_loop:
 	la $a0, msg_barra		
 	syscall					
 	li $v0, 4 # Mesma coisa que o primeiro syscall
-	addi $a0, $t3, 56 # Placa está em slot + 56
+	addi $a0, $t3, 64 # Placa está em slot + 64
 	syscall
 	li $v0, 4 # Syscall para printar string
 	la $a0, quebra_linha			
 	syscall	 
 	
-	addi $t3, $t3, 73 # Avança 73 bytes até o próximo slot de automóvel
+	addi $t3, $t3, 74 # Avanca 74 bytes ate o proximo slot de automovel
 	addi $t2, $t2, 1 # Conta mais um automóvel
 	j imprimir_autos_loop # Volta para o laço
+	
+prox_vaga_auto:
+	addi $t3, $t3, 74
+	addi $t2, $t2, 1
+	j imprimir_autos_loop
 
 imprimir_ap_fim:
 	jr $ra # Volta para quem chamou
@@ -1367,4 +1374,7 @@ save_data:
 	move $a0, $t1		# Define o file descriptor
 	syscall
 
+	# Restaura a pilha e retorna para quem chamou
+	addi $sp, $sp, 8	# Desaloca os 8 bytes da pilha
+	jr $ra			# Retorna da fun��o save_data
 
