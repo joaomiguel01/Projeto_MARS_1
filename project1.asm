@@ -40,9 +40,9 @@
 	apt_invalido:   .asciiz "Falha: AP invalido\n"
 	apt_lotado:     .asciiz "Falha: AP com numero max de moradores\n"
 	nome_vazio:	.asciiz "Falha: Nome vazio\n"
-	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]: " 	# Mensagem de confirmação de salvamento
+	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]:\n" 	# Mensagem de confirmação de salvamento
 	err_conf_msg:		.asciiz "Caractere invalido! Por favor digite apenas 'S' ou 'N'!\n"
-	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]: "
+	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]:\n"
 	msg_limite_auto:        .asciiz "Falha: AP com numero max de automoveis\n"
 	msg_tipo_invalido:      .asciiz "Falha: tipo invalido\n"
 	msg_auto_nao_encontrado:    .asciiz "Falha: automovel nao encontrado\n"
@@ -877,6 +877,7 @@ recarregar:
 	li $a2, 0		# Modo
 	syscall
 	
+	bltz $v0, main_loop	#se der erro ao abrir (< 0), volta ao menu
 	move $t1, $v0		# Salva o file descriptor
 	
 	# 2º Ler dados do arquivo e carregar em main_memory
@@ -1252,7 +1253,7 @@ imprimir_ap:
 	li $v0, 4 # Syscall para printar string
 	la $a0, msg_ap_vazio		
 	syscall
-	jr $ra # Volta pra quem chamou
+	jr $ra #volta para quem chamou
 
 imprimir_ap_cheio:
 	# Printa um morador por linha (percorre os 6 slots de 64 bytes)
@@ -1376,5 +1377,5 @@ save_data:
 
 	# Restaura a pilha e retorna para quem chamou
 	addi $sp, $sp, 8	# Desaloca os 8 bytes da pilha
-	jr $ra			# Retorna da fun��o save_data
+	jr $ra			# Retorna da fun��o save_data
 
