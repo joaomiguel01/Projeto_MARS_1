@@ -40,9 +40,9 @@
 	apt_invalido:   .asciiz "Falha: AP invalido\n"
 	apt_lotado:     .asciiz "Falha: AP com numero max de moradores\n"
 	nome_vazio:	.asciiz "Falha: Nome vazio\n"
-	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]: " 	# Mensagem de confirmação de salvamento
+	save_conf_msg:		.asciiz "Deseja salvar as alteracoes? [S/N]:\n" 	# Mensagem de confirmação de salvamento
 	err_conf_msg:		.asciiz "Caractere invalido! Por favor digite apenas 'S' ou 'N'!\n"
-	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]: "
+	form_conf_msg:		.asciiz "Deseja apagar todos os dados do programa atual? [S/N]:\n"
 	msg_limite_auto:        .asciiz "Falha: AP com numero max de automoveis\n"
 	msg_tipo_invalido:      .asciiz "Falha: tipo invalido\n"
 	msg_auto_nao_encontrado:    .asciiz "Falha: automovel nao encontrado\n"
@@ -410,6 +410,7 @@ addMorador:
 #contador 6 vezes
 addi $t3, $0, 0 #contador
 move $t4, $s0 #copia para um registrador temporario
+	# 4 Busca por um slot livre
 achaApt: #achar um byte livre para guardar o morador
 	beq $t3, 6, lotado #compara o contador
 	lb $t1, 0($t4) #pega o byte  
@@ -418,6 +419,7 @@ achaApt: #achar um byte livre para guardar o morador
 	addi $t3, $t3, 1 #adiciona o contador
 	j achaApt #volta o loop
 	
+	# 5 Escrita e atualizacao
 guardar:
 	la $a1, cmd_option2 #manda a string de cmd_option2
 	move $a0, $t4 #guarda no slot de moradores
@@ -495,6 +497,7 @@ remocao:
 	li $a1, 64 # tamanho do slot 
 	jal limpar_buffer # zera os 64 bytes do morador
 	
+	# 6 Decremento e esvaziamento
 decrementa:
 	addi $s1, $s1, -1 # diminui 1 da quantidade de moradores
 	sb $s1, 385($s0) # grava a nova quantidade de moradores no byte 385
@@ -502,7 +505,7 @@ decrementa:
 	j main_loop # se nao, volta para o menu
 
 vazio:
-	sb $0, 384($s0) # grava a nova quantidade de moradores
+	sb $0, 384($s0) # grava o status do apartamento
 	addi $a0, $s0, 388 # endereco onde comecam os dados de automoveis
 	li $a1, 148 # total de bytes dos automoveis
 	jal limpar_buffer # apaga tudo dos automoveis
@@ -877,6 +880,7 @@ recarregar:
 	li $a2, 0		# Modo
 	syscall
 	
+	bltz $v0, main_loop	#se der erro ao abrir (< 0), volta ao menu
 	move $t1, $v0		# Salva o file descriptor
 	
 	# 2º Ler dados do arquivo e carregar em main_memory
@@ -1165,6 +1169,7 @@ existeApt:
 	lb $t1, 0($t5)#le o primeiro byte
 	beq $t1, 0, invalido #verifica se eh 0, se for, eh invalido
 
+	# 1 conversao de ascii para inteiro
 addi $t0, $0, 0 #acumulador usado para somar/guardar o caracter em ascii
 addi $t3, $0, 10 #valor usado para multiplicar o acumulador
 #$t5 usado para guardar o valor original do endereco
@@ -1187,6 +1192,7 @@ acumulador:
 	addi $t5, $t5, 1 #passa para o proximo caracter
 	j acumulador #volta para o loop
 
+	# 2 Extrai o andar e quarto
 separaAndar:
 #para descobrir o andar e o numero de quarto, divide o numero do apt por 100
 #o quociente seria o andar e o resto o final do apt
@@ -1200,6 +1206,8 @@ addi $t1, $0, 100 #usado para fazer a divisao
 	blt $t3, 1, invalido #verifica se eh menor que 1
 	bgt $t3, 2, invalido #verifica se eh maior que 2
 #se passou em tudo, entao calcula o endereco com o main
+
+	# 3 Mapeamento linear de indice
 #faremos um indice:(andar-1).2 + (quarto-1)
 #transformamos o andar e o quarto em indices de 0 a 23, apt 101 eh 0, 102 eh 1 e assim vai
 #indice=$v0
@@ -1207,11 +1215,15 @@ addi $t1, $0, 100 #usado para fazer a divisao
 	sll $t4, $t4, 1 #(andar-1).2
 	addi $t5, $t3, -1 #quarto-1
 	add $t4, $t4, $t5 #(andar-1).2 + (quarto-1)
+	
+	# 4 Calculo do endereco RAM
 addi $t5, $0, 537 #tamanho de cada apt
 	multu $t4, $t5 #multiplica o indice pelo tamanho de um apt
 	mflo $t6 #acessa o valor
 	la $t7, main_memory #acessa o endereco da memoria principal
 	add $v0, $t6, $t7 #soma o indice com o endereco de memoria, assim obtendo o endereco de um apt
+	
+	# 5 Retorno da funcao
 	sb $t2, 386($v0) # Salva o andar (1 a 12) no byte 386
     	sb $t3, 387($v0) # Salva o quarto (1 ou 2) no byte 387
     	move $v1, $t0 # Deixa o numero completo (ex: 1102) em $v1
@@ -1252,7 +1264,7 @@ imprimir_ap:
 	li $v0, 4 # Syscall para printar string
 	la $a0, msg_ap_vazio		
 	syscall
-	jr $ra # Volta pra quem chamou
+	jr $ra #volta para quem chamou
 
 imprimir_ap_cheio:
 	# Printa um morador por linha (percorre os 6 slots de 64 bytes)
@@ -1376,5 +1388,5 @@ save_data:
 
 	# Restaura a pilha e retorna para quem chamou
 	addi $sp, $sp, 8	# Desaloca os 8 bytes da pilha
-	jr $ra			# Retorna da fun��o save_data
+	jr $ra			# Retorna da fun��o save_data
 
